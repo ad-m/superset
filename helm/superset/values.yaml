@@ -249,7 +249,7 @@ supersetWorker:
     - "/bin/sh"
     - "-c"
     - ". {{ .Values.configMountPath }}/superset_bootstrap.sh; celery --app=superset.tasks.celery_app:app worker"
-  forceReload: false # If true, forces deployment to reload on each upgrade
+  forceReload: [] # If true, forces deployment to reload on each upgrade
   initContainers:
     - name: wait-for-postgres
       image: busybox:latest
@@ -357,7 +357,7 @@ postgresql:
   enabled: true
   ##
   ## The name of an existing secret that contains the postgres password.
-  existingSecret: secret-name
+  existingSecret:
   ## Name of the key containing the secret.
   existingSecretKey: postgresql-password
   ##
@@ -402,7 +402,7 @@ redis:
   usePassword: false
   ##
   ## The name of an existing secret that contains the redis password.
-  existingSecret: secret-name
+  existingSecret:
   ## Name of the key containing the secret.
   existingSecretKey: redis-password
   ##
