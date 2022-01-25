@@ -44,3 +44,7 @@ jobs:
           CT_CHART_DIRS: helm
           CT_LINT_CONF: lintconf.yaml
           CT_SINCE: HEAD
+
+      - name: Run helm lint on 'helm/superset' 
+        run: helm lint
+        working-directory: helm/superset
