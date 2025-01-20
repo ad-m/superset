@@ -16,7 +16,7 @@
 # under the License.
 # pylint: disable=import-outside-toplevel, unused-argument
 
-from typing import Any, Dict
+from typing import Any
 
 
 def test_update_id_refs_immune_missing(  # pylint: disable=invalid-name
@@ -29,18 +29,24 @@ def test_update_id_refs_immune_missing(  # pylint: disable=invalid-name
     immune to filters. The missing chart ID should be simply ignored when the
     dashboard is imported.
     """
-    from superset.dashboards.commands.importers.v1.utils import update_id_refs
+    from superset.commands.dashboard.importers.v1.utils import update_id_refs
 
     config = {
         "position": {
             "CHART1": {
                 "id": "CHART1",
-                "meta": {"chartId": 101, "uuid": "uuid1",},
+                "meta": {
+                    "chartId": 101,
+                    "uuid": "uuid1",
+                },
                 "type": "CHART",
             },
             "CHART2": {
                 "id": "CHART2",
-                "meta": {"chartId": 102, "uuid": "uuid2",},
+                "meta": {
+                    "chartId": 102,
+                    "uuid": "uuid2",
+                },
                 "type": "CHART",
             },
         },
@@ -49,11 +55,11 @@ def test_update_id_refs_immune_missing(  # pylint: disable=invalid-name
                 "101": {"filter_name": {"immune": [102, 103]}},
                 "104": {"filter_name": {"immune": [102, 103]}},
             },
+            "native_filter_configuration": [],
         },
-        "native_filter_configuration": [],
     }
     chart_ids = {"uuid1": 1, "uuid2": 2}
-    dataset_info: Dict[str, Dict[str, Any]] = {}  # not used
+    dataset_info: dict[str, dict[str, Any]] = {}  # not used
 
     fixed = update_id_refs(config, chart_ids, dataset_info)
     assert fixed == {
@@ -69,6 +75,49 @@ def test_update_id_refs_immune_missing(  # pylint: disable=invalid-name
                 "type": "CHART",
             },
         },
-        "metadata": {"filter_scopes": {"1": {"filter_name": {"immune": [2]}}}},
-        "native_filter_configuration": [],
+        "metadata": {
+            "filter_scopes": {"1": {"filter_name": {"immune": [2]}}},
+            "native_filter_configuration": [],
+        },
+    }
+
+
+def test_update_native_filter_config_scope_excluded():
+    from superset.commands.dashboard.importers.v1.utils import update_id_refs
+
+    config = {
+        "position": {
+            "CHART1": {
+                "id": "CHART1",
+                "meta": {"chartId": 101, "uuid": "uuid1"},
+                "type": "CHART",
+            },
+            "CHART2": {
+                "id": "CHART2",
+                "meta": {"chartId": 102, "uuid": "uuid2"},
+                "type": "CHART",
+            },
+        },
+        "metadata": {
+            "native_filter_configuration": [{"scope": {"excluded": [101, 102, 103]}}],
+        },
+    }
+    chart_ids = {"uuid1": 1, "uuid2": 2}
+    dataset_info: dict[str, dict[str, Any]] = {}  # not used
+
+    fixed = update_id_refs(config, chart_ids, dataset_info)
+    assert fixed == {
+        "position": {
+            "CHART1": {
+                "id": "CHART1",
+                "meta": {"chartId": 1, "uuid": "uuid1"},
+                "type": "CHART",
+            },
+            "CHART2": {
+                "id": "CHART2",
+                "meta": {"chartId": 2, "uuid": "uuid2"},
+                "type": "CHART",
+            },
+        },
+        "metadata": {"native_filter_configuration": [{"scope": {"excluded": [1, 2]}}]},
     }

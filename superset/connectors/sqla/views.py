@@ -15,45 +15,59 @@
 # specific language governing permissions and limitations
 # under the License.
 """Views used by the SqlAlchemy connector"""
+
 import logging
 import re
-from dataclasses import dataclass, field
-from typing import Any, cast, Dict, List, Union
 
-from flask import current_app, flash, Markup, redirect
+from flask import flash, redirect
 from flask_appbuilder import CompactCRUDMixin, expose
-from flask_appbuilder.actions import action
+from flask_appbuilder.fields import QuerySelectField
 from flask_appbuilder.fieldwidgets import Select2Widget
-from flask_appbuilder.hooks import before_request
 from flask_appbuilder.models.sqla.interface import SQLAInterface
-from flask_appbuilder.security.decorators import has_access
-from flask_babel import gettext as __, lazy_gettext as _
-from werkzeug.exceptions import NotFound
-from wtforms.ext.sqlalchemy.fields import QuerySelectField
-from wtforms.validators import Regexp
+from flask_appbuilder.security.decorators import (
+    has_access,
+    permission_name,
+)
+from flask_babel import lazy_gettext as _
+from markupsafe import Markup
+from wtforms.validators import DataRequired, Regexp
 
-from superset import app, db, is_feature_enabled
-from superset.connectors.base.views import DatasourceModelView
+from superset import db
 from superset.connectors.sqla import models
 from superset.constants import MODEL_VIEW_RW_METHOD_PERMISSION_MAP, RouteMethod
-from superset.typing import FlaskResponse
+from superset.superset_typing import FlaskResponse
 from superset.utils import core as utils
 from superset.views.base import (
-    check_ownership,
-    create_table_permissions,
+    BaseSupersetView,
     DatasourceFilter,
     DeleteMixin,
+    DeprecateModelViewMixin,
     ListWidgetWithCheckboxes,
-    SupersetListWidget,
     SupersetModelView,
-    validate_sqlatable,
     YamlExportMixin,
 )
 
 logger = logging.getLogger(__name__)
 
 
-class TableColumnInlineView(CompactCRUDMixin, SupersetModelView):
+class SelectDataRequired(DataRequired):  # pylint: disable=too-few-public-methods
+    """
+    Select required flag on the input field will not work well on Chrome
+    Console error:
+        An invalid form control with name='tables' is not focusable.
+
+    This makes a simple override to the DataRequired to be used specifically with
+    select fields
+    """
+
+    field_flags = ()
+
+
+class TableColumnInlineView(  # pylint: disable=too-many-ancestors
+    DeprecateModelViewMixin,
+    CompactCRUDMixin,
+    SupersetModelView,
+):
     datamodel = SQLAInterface(models.TableColumn)
     # TODO TODO, review need for this on related_views
     class_permission_name = "Dataset"
@@ -72,6 +86,7 @@ class TableColumnInlineView(CompactCRUDMixin, SupersetModelView):
         "verbose_name",
         "description",
         "type",
+        "advanced_data_type",
         "groupby",
         "filterable",
         "table",
@@ -85,9 +100,11 @@ class TableColumnInlineView(CompactCRUDMixin, SupersetModelView):
         "column_name",
         "verbose_name",
         "type",
+        "advanced_data_type",
         "groupby",
         "filterable",
         "is_dttm",
+        "extra",
     ]
     page_size = 500
     description_columns = {
@@ -150,6 +167,7 @@ class TableColumnInlineView(CompactCRUDMixin, SupersetModelView):
         "is_dttm": _("Is temporal"),
         "python_date_format": _("Datetime Format"),
         "type": _("Type"),
+        "advanced_data_type": _("Business Data Type"),
     }
     validators_columns = {
         "python_date_format": [
@@ -173,7 +191,7 @@ class TableColumnInlineView(CompactCRUDMixin, SupersetModelView):
     add_form_extra_fields = {
         "table": QuerySelectField(
             "Table",
-            query_factory=lambda: db.session.query(models.SqlaTable),
+            query_func=lambda: db.session.query(models.SqlaTable),
             allow_blank=True,
             widget=Select2Widget(extra_classes="readonly"),
         )
@@ -181,29 +199,12 @@ class TableColumnInlineView(CompactCRUDMixin, SupersetModelView):
 
     edit_form_extra_fields = add_form_extra_fields
 
-    def pre_add(self, item: "models.SqlMetric") -> None:
-        logger.warning(
-            "This endpoint is deprecated and will be removed in version 2.0.0"
-        )
-        if app.config["OLD_API_CHECK_DATASET_OWNERSHIP"]:
-            check_ownership(item.table)
 
-    def pre_update(self, item: "models.SqlMetric") -> None:
-        logger.warning(
-            "This endpoint is deprecated and will be removed in version 2.0.0"
-        )
-        if app.config["OLD_API_CHECK_DATASET_OWNERSHIP"]:
-            check_ownership(item.table)
-
-    def pre_delete(self, item: "models.SqlMetric") -> None:
-        logger.warning(
-            "This endpoint is deprecated and will be removed in version 2.0.0"
-        )
-        if app.config["OLD_API_CHECK_DATASET_OWNERSHIP"]:
-            check_ownership(item.table)
-
-
-class SqlMetricInlineView(CompactCRUDMixin, SupersetModelView):
+class SqlMetricInlineView(  # pylint: disable=too-many-ancestors
+    DeprecateModelViewMixin,
+    CompactCRUDMixin,
+    SupersetModelView,
+):
     datamodel = SQLAInterface(models.SqlMetric)
     class_permission_name = "Dataset"
     method_permission_name = MODEL_VIEW_RW_METHOD_PERMISSION_MAP
@@ -214,7 +215,7 @@ class SqlMetricInlineView(CompactCRUDMixin, SupersetModelView):
     add_title = _("Add Metric")
     edit_title = _("Edit Metric")
 
-    list_columns = ["metric_name", "verbose_name", "metric_type"]
+    list_columns = ["metric_name", "verbose_name", "metric_type", "extra"]
     edit_columns = [
         "metric_name",
         "description",
@@ -223,6 +224,7 @@ class SqlMetricInlineView(CompactCRUDMixin, SupersetModelView):
         "expression",
         "table",
         "d3format",
+        "currency",
         "extra",
         "warning_text",
     ]
@@ -266,7 +268,7 @@ class SqlMetricInlineView(CompactCRUDMixin, SupersetModelView):
     add_form_extra_fields = {
         "table": QuerySelectField(
             "Table",
-            query_factory=lambda: db.session.query(models.SqlaTable),
+            query_func=lambda: db.session.query(models.SqlaTable),
             allow_blank=True,
             widget=Select2Widget(extra_classes="readonly"),
         )
@@ -274,118 +276,20 @@ class SqlMetricInlineView(CompactCRUDMixin, SupersetModelView):
 
     edit_form_extra_fields = add_form_extra_fields
 
-    def pre_add(self, item: "models.SqlMetric") -> None:
-        logger.warning(
-            "This endpoint is deprecated and will be removed in version 2.0.0"
-        )
-        if app.config["OLD_API_CHECK_DATASET_OWNERSHIP"]:
-            check_ownership(item.table)
 
-    def pre_update(self, item: "models.SqlMetric") -> None:
-        logger.warning(
-            "This endpoint is deprecated and will be removed in version 2.0.0"
-        )
-        if app.config["OLD_API_CHECK_DATASET_OWNERSHIP"]:
-            check_ownership(item.table)
+class RowLevelSecurityView(BaseSupersetView):
+    route_base = "/rowlevelsecurity"
+    class_permission_name = "RowLevelSecurity"
 
-    def pre_delete(self, item: "models.SqlMetric") -> None:
-        logger.warning(
-            "This endpoint is deprecated and will be removed in version 2.0.0"
-        )
-        if app.config["OLD_API_CHECK_DATASET_OWNERSHIP"]:
-            check_ownership(item.table)
-
-
-class RowLevelSecurityListWidget(
-    SupersetListWidget
-):  # pylint: disable=too-few-public-methods
-    template = "superset/models/rls/list.html"
-
-    def __init__(self, **kwargs: Any):
-        kwargs["appbuilder"] = current_app.appbuilder
-        super().__init__(**kwargs)
-
-
-class RowLevelSecurityFiltersModelView(SupersetModelView, DeleteMixin):
-    datamodel = SQLAInterface(models.RowLevelSecurityFilter)
-
-    list_widget = cast(SupersetListWidget, RowLevelSecurityListWidget)
-
-    list_title = _("Row level security filter")
-    show_title = _("Show Row level security filter")
-    add_title = _("Add Row level security filter")
-    edit_title = _("Edit Row level security filter")
-
-    list_columns = [
-        "filter_type",
-        "tables",
-        "roles",
-        "group_key",
-        "clause",
-        "creator",
-        "modified",
-    ]
-    order_columns = ["filter_type", "group_key", "clause", "modified"]
-    edit_columns = ["filter_type", "tables", "roles", "group_key", "clause"]
-    show_columns = edit_columns
-    search_columns = ("filter_type", "tables", "roles", "group_key", "clause")
-    add_columns = edit_columns
-    base_order = ("changed_on", "desc")
-    description_columns = {
-        "filter_type": _(
-            "Regular filters add where clauses to queries if a user belongs to a "
-            "role referenced in the filter. Base filters apply filters to all queries "
-            "except the roles defined in the filter, and can be used to define what "
-            "users can see if no RLS filters within a filter group apply to them."
-        ),
-        "tables": _("These are the tables this filter will be applied to."),
-        "roles": _(
-            "For regular filters, these are the roles this filter will be "
-            "applied to. For base filters, these are the roles that the "
-            "filter DOES NOT apply to, e.g. Admin if admin should see all "
-            "data."
-        ),
-        "group_key": _(
-            "Filters with the same group key will be ORed together within the group, "
-            "while different filter groups will be ANDed together. Undefined group "
-            "keys are treated as unique groups, i.e. are not grouped together. "
-            "For example, if a table has three filters, of which two are for "
-            "departments Finance and Marketing (group key = 'department'), and one "
-            "refers to the region Europe (group key = 'region'), the filter clause "
-            "would apply the filter (department = 'Finance' OR department = "
-            "'Marketing') AND (region = 'Europe')."
-        ),
-        "clause": _(
-            "This is the condition that will be added to the WHERE clause. "
-            "For example, to only return rows for a particular client, "
-            "you might define a regular filter with the clause `client_id = 9`. To "
-            "display no rows unless a user belongs to a RLS filter role, a base "
-            "filter can be created with the clause `1 = 0` (always false)."
-        ),
-    }
-    label_columns = {
-        "tables": _("Tables"),
-        "roles": _("Roles"),
-        "clause": _("Clause"),
-        "creator": _("Creator"),
-        "modified": _("Modified"),
-    }
-    if app.config["RLS_FORM_QUERY_REL_FIELDS"]:
-        add_form_query_rel_fields = app.config["RLS_FORM_QUERY_REL_FIELDS"]
-        edit_form_query_rel_fields = add_form_query_rel_fields
-
-    @staticmethod
-    def is_enabled() -> bool:
-        return is_feature_enabled("ROW_LEVEL_SECURITY")
-
-    @before_request
-    def ensure_enabled(self) -> None:
-        if not self.is_enabled():
-            raise NotFound()
+    @expose("/list/")
+    @has_access
+    @permission_name("read")
+    def list(self) -> FlaskResponse:
+        return super().render_app_template()
 
 
 class TableModelView(  # pylint: disable=too-many-ancestors
-    DatasourceModelView, DeleteMixin, YamlExportMixin
+    DeprecateModelViewMixin, SupersetModelView, DeleteMixin, YamlExportMixin
 ):
     datamodel = SQLAInterface(models.SqlaTable)
     class_permission_name = "Dataset"
@@ -416,6 +320,8 @@ class TableModelView(  # pylint: disable=too-many-ancestors
         "is_sqllab_view",
         "template_params",
         "extra",
+        "normalize_columns",
+        "always_filter_main_dttm",
     ]
     base_filters = [["id", DatasourceFilter, lambda: []]]
     show_columns = edit_columns + ["perm", "slices"]
@@ -438,7 +344,7 @@ class TableModelView(  # pylint: disable=too-many-ancestors
         "offset": _("Timezone offset (in hours) for this datasource"),
         "table_name": _("Name of the table that exists in the source database"),
         "schema": _(
-            "Schema, as used only in some databases like Postgres, Redshift " "and DB2"
+            "Schema, as used only in some databases like Postgres, Redshift and DB2"
         ),
         "description": Markup(
             'Supports <a href="https://daringfireball.net/projects/markdown/">'
@@ -464,7 +370,7 @@ class TableModelView(  # pylint: disable=too-many-ancestors
             "from the backend on the fly"
         ),
         "is_sqllab_view": _(
-            "Whether the table was generated by the 'Visualize' flow " "in SQL Lab"
+            "Whether the table was generated by the 'Visualize' flow in SQL Lab"
         ),
         "template_params": _(
             "A set of parameters that become available in the query using "
@@ -481,6 +387,16 @@ class TableModelView(  # pylint: disable=too-many-ancestors
             '"Data Platform Team", "details": "This table is the source of truth." '
             '}, "warning_markdown": "This is a warning." }`.',
             True,
+        ),
+        "normalize_columns": _(
+            "Allow column names to be changed to case insensitive format, "
+            "if supported (e.g. Oracle, Snowflake)."
+        ),
+        "always_filter_main_dttm": _(
+            "Datasets can have a main temporal column (main_dttm_col), "
+            "but can also have secondary time columns. "
+            "When this attribute is true, whenever the secondary columns are filtered, "
+            "the same filter is applied to the main datetime column."
         ),
     }
     label_columns = {
@@ -508,25 +424,13 @@ class TableModelView(  # pylint: disable=too-many-ancestors
     edit_form_extra_fields = {
         "database": QuerySelectField(
             "Database",
-            query_factory=lambda: db.session.query(models.Database),
+            query_func=lambda: db.session.query(models.Database),
+            get_pk_func=lambda item: item.id,
             widget=Select2Widget(extra_classes="readonly"),
         )
     }
 
-    def pre_add(self, item: "TableModelView") -> None:
-        logger.warning(
-            "This endpoint is deprecated and will be removed in version 2.0.0"
-        )
-        validate_sqlatable(item)
-
-    def pre_update(self, item: "TableModelView") -> None:
-        logger.warning(
-            "This endpoint is deprecated and will be removed in version 2.0.0"
-        )
-        if app.config["OLD_API_CHECK_DATASET_OWNERSHIP"]:
-            check_ownership(item)
-
-    def post_add(  # pylint: disable=arguments-differ
+    def post_add(
         self,
         item: "TableModelView",
         flash_message: bool = True,
@@ -534,7 +438,6 @@ class TableModelView(  # pylint: disable=too-many-ancestors
     ) -> None:
         if fetch_metadata:
             item.fetch_metadata()
-        create_table_permissions(item)
         if flash_message:
             flash(
                 _(
@@ -552,102 +455,22 @@ class TableModelView(  # pylint: disable=too-many-ancestors
     def _delete(self, pk: int) -> None:
         DeleteMixin._delete(self, pk)
 
-    @expose("/edit/<pk>", methods=["GET", "POST"])
+    @expose(
+        "/edit/<pk>",
+        methods=(
+            "GET",
+            "POST",
+        ),
+    )
     @has_access
     def edit(self, pk: str) -> FlaskResponse:
         """Simple hack to redirect to explore view after saving"""
         resp = super().edit(pk)
         if isinstance(resp, str):
             return resp
-        return redirect("/superset/explore/table/{}/".format(pk))
-
-    @action(
-        "refresh", __("Refresh Metadata"), __("Refresh column metadata"), "fa-refresh"
-    )
-    def refresh(  # pylint: disable=no-self-use,
-        self, tables: Union["TableModelView", List["TableModelView"]]
-    ) -> FlaskResponse:
-        logger.warning(
-            "This endpoint is deprecated and will be removed in version 2.0.0"
-        )
-        if not isinstance(tables, list):
-            tables = [tables]
-
-        @dataclass
-        class RefreshResults:
-            successes: List[TableModelView] = field(default_factory=list)
-            failures: List[TableModelView] = field(default_factory=list)
-            added: Dict[str, List[str]] = field(default_factory=dict)
-            removed: Dict[str, List[str]] = field(default_factory=dict)
-            modified: Dict[str, List[str]] = field(default_factory=dict)
-
-        results = RefreshResults()
-
-        for table_ in tables:
-            try:
-                metadata_results = table_.fetch_metadata()
-                if metadata_results.added:
-                    results.added[table_.table_name] = metadata_results.added
-                if metadata_results.removed:
-                    results.removed[table_.table_name] = metadata_results.removed
-                if metadata_results.modified:
-                    results.modified[table_.table_name] = metadata_results.modified
-                results.successes.append(table_)
-            except Exception:  # pylint: disable=broad-except
-                results.failures.append(table_)
-
-        if len(results.successes) > 0:
-            success_msg = _(
-                "Metadata refreshed for the following table(s): %(tables)s",
-                tables=", ".join([t.table_name for t in results.successes]),
-            )
-            flash(success_msg, "info")
-        if results.added:
-            added_tables = []
-            for table, cols in results.added.items():
-                added_tables.append(f"{table} ({', '.join(cols)})")
-            flash(
-                _(
-                    "The following tables added new columns: %(tables)s",
-                    tables=", ".join(added_tables),
-                ),
-                "info",
-            )
-        if results.removed:
-            removed_tables = []
-            for table, cols in results.removed.items():
-                removed_tables.append(f"{table} ({', '.join(cols)})")
-            flash(
-                _(
-                    "The following tables removed columns: %(tables)s",
-                    tables=", ".join(removed_tables),
-                ),
-                "info",
-            )
-        if results.modified:
-            modified_tables = []
-            for table, cols in results.modified.items():
-                modified_tables.append(f"{table} ({', '.join(cols)})")
-            flash(
-                _(
-                    "The following tables update column metadata: %(tables)s",
-                    tables=", ".join(modified_tables),
-                ),
-                "info",
-            )
-        if len(results.failures) > 0:
-            failure_msg = _(
-                "Unable to refresh metadata for the following table(s): %(tables)s",
-                tables=", ".join([t.table_name for t in results.failures]),
-            )
-            flash(failure_msg, "danger")
-
-        return redirect("/tablemodelview/list/")
+        return redirect(f"/explore/?datasource_type=table&datasource_id={pk}")
 
     @expose("/list/")
     @has_access
     def list(self) -> FlaskResponse:
-        if not is_feature_enabled("ENABLE_REACT_CRUD_VIEWS"):
-            return super().list()
-
         return super().render_app_template()

@@ -17,8 +17,7 @@
  * under the License.
  */
 import userEvent from '@testing-library/user-event';
-import React from 'react';
-import { render, screen } from 'spec/helpers/testing-library';
+import { render, screen, waitFor } from 'spec/helpers/testing-library';
 import { CopyToClipboardButton } from '.';
 
 test('Render a button', () => {
@@ -28,14 +27,26 @@ test('Render a button', () => {
   expect(screen.getByRole('button')).toBeInTheDocument();
 });
 
-test('Should copy to clipboard', () => {
-  document.execCommand = jest.fn();
+test('Should copy to clipboard', async () => {
+  const callback = jest.fn();
+  document.execCommand = callback;
+
+  const originalClipboard = { ...global.navigator.clipboard };
+  // @ts-ignore
+  global.navigator.clipboard = { write: callback, writeText: callback };
 
   render(<CopyToClipboardButton data={{ copy: 'data', data: 'copy' }} />, {
     useRedux: true,
   });
 
-  expect(document.execCommand).toHaveBeenCalledTimes(0);
+  expect(callback).toHaveBeenCalledTimes(0);
   userEvent.click(screen.getByRole('button'));
-  expect(document.execCommand).toHaveBeenCalledWith('copy');
+
+  await waitFor(() => {
+    expect(callback).toHaveBeenCalled();
+  });
+
+  jest.resetAllMocks();
+  // @ts-ignore
+  global.navigator.clipboard = originalClipboard;
 });

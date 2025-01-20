@@ -16,22 +16,24 @@
 #  under the License.
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from pandas import DataFrame
 
+from tests.common.logger_utils import log
 from tests.example_data.data_loading.pandas.pandas_data_loader import TableToDfConvertor
 
 if TYPE_CHECKING:
     from tests.example_data.data_loading.data_definitions.types import Table
 
 
+@log
 class TableToDfConvertorImpl(TableToDfConvertor):
     convert_datetime_to_str: bool
-    _time_format: Optional[str]
+    _time_format: str | None
 
     def __init__(
-        self, convert_ds_to_datetime: bool, time_format: Optional[str] = None
+        self, convert_ds_to_datetime: bool, time_format: str | None = None
     ) -> None:
         self.convert_datetime_to_str = convert_ds_to_datetime
         self._time_format = time_format

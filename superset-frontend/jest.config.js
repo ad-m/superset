@@ -17,24 +17,27 @@
  * under the License.
  */
 
+// timezone for unit tests
+process.env.TZ = 'America/New_York';
+
 module.exports = {
-  testRegex: '\\/(spec|src|plugins|packages)\\/.*(_spec|\\.test)\\.[jt]sx?$',
+  testRegex:
+    '\\/superset-frontend\\/(spec|src|plugins|packages|tools)\\/.*(_spec|\\.test)\\.[jt]sx?$',
   moduleNameMapper: {
     '\\.(css|less|geojson)$': '<rootDir>/spec/__mocks__/mockExportObject.js',
     '\\.(gif|ttf|eot|png|jpg)$': '<rootDir>/spec/__mocks__/mockExportString.js',
     '\\.svg$': '<rootDir>/spec/__mocks__/svgrMock.tsx',
     '^src/(.*)$': '<rootDir>/src/$1',
     '^spec/(.*)$': '<rootDir>/spec/$1',
-    // mapping plugins of superset-ui to souce code
+    // mapping plugins of superset-ui to source code
     '@superset-ui/(.*)$': '<rootDir>/node_modules/@superset-ui/$1/src',
   },
   testEnvironment: 'jsdom',
-  modulePathIgnorePatterns: [
-    '<rootDir>/temporary_superset_ui',
-    '<rootDir>/packages/generator-superset',
-  ],
+  modulePathIgnorePatterns: ['<rootDir>/packages/generator-superset'],
   setupFilesAfterEnv: ['<rootDir>/spec/helpers/setup.ts'],
-  testURL: 'http://localhost',
+  testEnvironmentOptions: {
+    url: 'http://localhost',
+  },
   collectCoverageFrom: [
     'src/**/*.{js,jsx,ts,tsx}',
     '{packages,plugins}/**/src/**/*.{js,jsx,ts,tsx}',
@@ -49,11 +52,23 @@ module.exports = {
     'tmp/',
     'dist/',
   ],
-  coverageReporters: ['lcov', 'json-summary', 'html'],
+  coverageReporters: ['lcov', 'json-summary', 'html', 'text'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   snapshotSerializers: ['@emotion/jest/enzyme-serializer'],
+  transformIgnorePatterns: [
+    'node_modules/(?!d3-(interpolate|color|time)|remark-gfm|markdown-table|micromark-*.|decode-named-character-reference|character-entities|mdast-util-*.|unist-util-*.|ccount|escape-string-regexp|nanoid|@rjsf/*.|sinon|echarts|zrender|fetch-mock|pretty-ms|parse-ms|ol)',
+  ],
   globals: {
     __DEV__: true,
     caches: true,
   },
+  reporters: [
+    'default',
+    [
+      './node_modules/jest-html-reporter',
+      {
+        pageTitle: 'Test Report',
+      },
+    ],
+  ],
 };

@@ -16,11 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React from 'react';
+import { FC } from 'react';
 import { FormItem } from 'src/components/Form';
-import { Input, TextArea } from 'src/common/components';
-import { styled, t } from '@superset-ui/core';
-import { NativeFilterType } from '../types';
+import { Input, TextArea } from 'src/components/Input';
+import { NativeFilterType, styled, t } from '@superset-ui/core';
 
 interface Props {
   componentId: string;
@@ -35,7 +34,7 @@ const Container = styled.div`
   `}
 `;
 
-const DividerConfigForm: React.FC<Props> = ({ componentId, divider }) => (
+const DividerConfigForm: FC<Props> = ({ componentId, divider }) => (
   <Container>
     <FormItem
       initialValue={divider ? divider.title : ''}
@@ -57,7 +56,7 @@ const DividerConfigForm: React.FC<Props> = ({ componentId, divider }) => (
     <FormItem
       hidden
       name={['filters', componentId, 'type']}
-      initialValue={NativeFilterType.DIVIDER}
+      initialValue={NativeFilterType.Divider}
     />
   </Container>
 );

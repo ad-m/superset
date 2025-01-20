@@ -22,6 +22,7 @@ import createCache from '@emotion/cache';
 
 export {
   css,
+  keyframes,
   jsx,
   ThemeProvider,
   CacheProvider as EmotionCacheProvider,
@@ -140,7 +141,8 @@ const defaultTheme = {
     weights: {
       light: 200,
       normal: 400,
-      bold: 700,
+      medium: 500,
+      bold: 600,
     },
     sizes: {
       xxs: 9,
@@ -159,6 +161,7 @@ const defaultTheme = {
   },
   transitionTiming: 0.3,
   gridUnit: 4,
+  brandIconMaxWidth: 37,
 };
 
 export type SupersetTheme = typeof defaultTheme;

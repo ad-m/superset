@@ -16,10 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React from 'react';
+import { Key } from 'react';
 import cx from 'classnames';
 import { styled, useTheme } from '@superset-ui/core';
-import { Dropdown, Menu } from 'src/common/components';
+import { AntdDropdown } from 'src/components';
+import { Menu } from 'src/components/Menu';
 import Icons from 'src/components/Icons';
 
 export interface OptionProps {
@@ -28,7 +29,7 @@ export interface OptionProps {
   className?: string;
 }
 
-export type OnChangeHandler = (key: React.Key) => void;
+export type OnChangeHandler = (key: Key) => void;
 export type RenderElementHandler = (option: OptionProps) => JSX.Element;
 
 export interface PopoverDropdownProps {
@@ -41,7 +42,7 @@ export interface PopoverDropdownProps {
 }
 
 interface HandleSelectProps {
-  key: React.Key;
+  key: Key;
 }
 
 const MenuItem = styled(Menu.Item)`
@@ -88,7 +89,7 @@ const PopoverDropdown = (props: PopoverDropdownProps) => {
   const theme = useTheme();
   const selected = options.find(opt => opt.value === value);
   return (
-    <Dropdown
+    <AntdDropdown
       trigger={['click']}
       overlayStyle={{ zIndex: theme.zIndex.max }}
       overlay={
@@ -114,7 +115,7 @@ const PopoverDropdown = (props: PopoverDropdownProps) => {
           css={{ marginTop: theme.gridUnit * 0.5 }}
         />
       </div>
-    </Dropdown>
+    </AntdDropdown>
   );
 };
 

@@ -17,7 +17,8 @@
  * under the License.
  */
 
-import { Behavior } from '../types/Base';
+import { Behavior, ChartLabel } from '../types/Base';
+import { ParseMethod } from '../../connection';
 
 interface LookupTable {
   [key: string]: boolean;
@@ -35,15 +36,23 @@ export interface ChartMetadataConfig {
   description?: string;
   datasourceCount?: number;
   enableNoResults?: boolean;
-  show?: boolean;
   supportedAnnotationTypes?: string[];
   thumbnail: string;
   useLegacyApi?: boolean;
   behaviors?: Behavior[];
-  deprecated?: boolean;
   exampleGallery?: ExampleImage[];
   tags?: string[];
   category?: string | null;
+  // deprecated: true hides a chart from all viz picker interactions.
+  deprecated?: boolean;
+  // label: ChartLabel.DEPRECATED which will display a "deprecated" label on the chart.
+  label?: ChartLabel | null;
+  labelExplanation?: string | null;
+  queryObjectCount?: number;
+  parseMethod?: ParseMethod;
+  // suppressContextMenu: true hides the default context menu for the chart.
+  // This is useful for viz plugins that define their own context menu.
+  suppressContextMenu?: boolean;
 }
 
 export default class ChartMetadata {
@@ -57,8 +66,6 @@ export default class ChartMetadata {
 
   description: string;
 
-  show: boolean;
-
   supportedAnnotationTypes: string[];
 
   thumbnail: string;
@@ -71,13 +78,23 @@ export default class ChartMetadata {
 
   enableNoResults: boolean;
 
-  deprecated: boolean;
-
   exampleGallery: ExampleImage[];
 
   tags: string[];
 
   category: string | null;
+
+  deprecated?: boolean;
+
+  label?: ChartLabel | null;
+
+  labelExplanation?: string | null;
+
+  queryObjectCount: number;
+
+  parseMethod: ParseMethod;
+
+  suppressContextMenu?: boolean;
 
   constructor(config: ChartMetadataConfig) {
     const {
@@ -85,23 +102,26 @@ export default class ChartMetadata {
       canBeAnnotationTypes = [],
       credits = [],
       description = '',
-      show = true,
       supportedAnnotationTypes = [],
       thumbnail,
       useLegacyApi = false,
       behaviors = [],
       datasourceCount = 1,
       enableNoResults = true,
-      deprecated = false,
       exampleGallery = [],
       tags = [],
       category = null,
+      deprecated = false,
+      label = null,
+      labelExplanation = null,
+      queryObjectCount = 1,
+      parseMethod = 'json-bigint',
+      suppressContextMenu = false,
     } = config;
 
     this.name = name;
     this.credits = credits;
     this.description = description;
-    this.show = show;
     this.canBeAnnotationTypes = canBeAnnotationTypes;
     this.canBeAnnotationTypesLookup = canBeAnnotationTypes.reduce(
       (prev: LookupTable, type: string) => {
@@ -118,10 +138,15 @@ export default class ChartMetadata {
     this.behaviors = behaviors;
     this.datasourceCount = datasourceCount;
     this.enableNoResults = enableNoResults;
-    this.deprecated = deprecated;
     this.exampleGallery = exampleGallery;
     this.tags = tags;
     this.category = category;
+    this.deprecated = deprecated;
+    this.label = label;
+    this.labelExplanation = labelExplanation;
+    this.queryObjectCount = queryObjectCount;
+    this.parseMethod = parseMethod;
+    this.suppressContextMenu = suppressContextMenu;
   }
 
   canBeAnnotationType(type: string): boolean {

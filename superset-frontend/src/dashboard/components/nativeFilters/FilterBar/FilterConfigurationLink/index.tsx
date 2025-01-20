@@ -16,56 +16,65 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React, { useState } from 'react';
+import { ReactNode, FC, useCallback, useState, memo } from 'react';
+
 import { useDispatch } from 'react-redux';
 import { setFilterConfiguration } from 'src/dashboard/actions/nativeFilters';
-import Button from 'src/components/Button';
-import { styled } from '@superset-ui/core';
-import { FilterConfiguration } from 'src/dashboard/components/nativeFilters/types';
-import { FiltersConfigModal } from 'src/dashboard/components/nativeFilters/FiltersConfigModal/FiltersConfigModal';
-import { getFilterBarTestId } from '..';
+import FiltersConfigModal from 'src/dashboard/components/nativeFilters/FiltersConfigModal/FiltersConfigModal';
+import { getFilterBarTestId } from '../utils';
+import { SaveFilterChangesType } from '../../FiltersConfigModal/types';
 
 export interface FCBProps {
   createNewOnOpen?: boolean;
   dashboardId?: number;
+  initialFilterId?: string;
+  onClick?: () => void;
+  children?: ReactNode;
 }
 
-const HeaderButton = styled(Button)`
-  padding: 0;
-`;
-
-export const FilterConfigurationLink: React.FC<FCBProps> = ({
+export const FilterConfigurationLink: FC<FCBProps> = ({
   createNewOnOpen,
   dashboardId,
+  initialFilterId,
+  onClick,
   children,
 }) => {
   const dispatch = useDispatch();
   const [isOpen, setOpen] = useState(false);
-
-  function close() {
+  const close = useCallback(() => {
     setOpen(false);
-  }
+  }, [setOpen]);
 
-  async function submit(filterConfig: FilterConfiguration) {
-    dispatch(await setFilterConfiguration(filterConfig));
-    close();
-  }
+  const submit = useCallback(
+    async (filterChanges: SaveFilterChangesType) => {
+      dispatch(await setFilterConfiguration(filterChanges));
+      close();
+    },
+    [dispatch, close],
+  );
+
+  const handleClick = useCallback(() => {
+    setOpen(true);
+    if (onClick) {
+      onClick();
+    }
+  }, [setOpen, onClick]);
 
   return (
     <>
-      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-      <HeaderButton
+      <div
         {...getFilterBarTestId('create-filter')}
-        buttonStyle="link"
-        buttonSize="xsmall"
-        onClick={() => setOpen(true)}
+        onClick={handleClick}
+        role="button"
+        tabIndex={0}
       >
         {children}
-      </HeaderButton>
+      </div>
       <FiltersConfigModal
         isOpen={isOpen}
         onSave={submit}
         onCancel={close}
+        initialFilterId={initialFilterId}
         createNewOnOpen={createNewOnOpen}
         key={`filters-for-${dashboardId}`}
       />
@@ -73,4 +82,4 @@ export const FilterConfigurationLink: React.FC<FCBProps> = ({
   );
 };
 
-export default FilterConfigurationLink;
+export default memo(FilterConfigurationLink);

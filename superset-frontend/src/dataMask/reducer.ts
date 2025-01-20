@@ -19,24 +19,27 @@
 
 /* eslint-disable no-param-reassign */
 // <- When we work with Immer, we need reassign, so disabling lint
-import produce from 'immer';
-import { DataMask, FeatureFlag } from '@superset-ui/core';
+import { produce } from 'immer';
+import {
+  DataMask,
+  DataMaskStateWithId,
+  DataMaskWithId,
+  isFeatureEnabled,
+  FeatureFlag,
+  Filter,
+  FilterConfiguration,
+  Filters,
+} from '@superset-ui/core';
 import { NATIVE_FILTER_PREFIX } from 'src/dashboard/components/nativeFilters/FiltersConfigModal/utils';
 import { HYDRATE_DASHBOARD } from 'src/dashboard/actions/hydrate';
-import { isFeatureEnabled } from 'src/featureFlags';
-import { DataMaskStateWithId, DataMaskWithId } from './types';
+import { SaveFilterChangesType } from 'src/dashboard/components/nativeFilters/FiltersConfigModal/types';
 import {
   AnyDataMaskAction,
   CLEAR_DATA_MASK_STATE,
-  SET_DATA_MASK_FOR_FILTER_CONFIG_COMPLETE,
+  SET_DATA_MASK_FOR_FILTER_CHANGES_COMPLETE,
   UPDATE_DATA_MASK,
 } from './actions';
-import {
-  Filter,
-  FilterConfiguration,
-} from '../dashboard/components/nativeFilters/types';
 import { areObjectsEqual } from '../reduxUtils';
-import { Filters } from '../dashboard/reducers/types';
 
 export function getInitialDataMask(
   id?: string | number,
@@ -98,6 +101,37 @@ function fillNativeFilters(
   });
 }
 
+function updateDataMaskForFilterChanges(
+  filterChanges: SaveFilterChangesType,
+  mergedDataMask: DataMaskStateWithId,
+  draftDataMask: DataMaskStateWithId,
+  initialDataMask?: Filters,
+) {
+  const dataMask = initialDataMask || {};
+
+  Object.entries(dataMask).forEach(([key, value]) => {
+    mergedDataMask[key] = { ...value, ...value.defaultDataMask };
+  });
+
+  filterChanges.deleted.forEach((filterId: string) => {
+    delete mergedDataMask[filterId];
+  });
+
+  filterChanges.modified.forEach((filter: Filter) => {
+    mergedDataMask[filter.id] = {
+      ...getInitialDataMask(filter.id),
+      ...filter.defaultDataMask,
+      ...filter,
+    };
+  });
+
+  Object.values(draftDataMask).forEach(filter => {
+    if (!String(filter?.id).startsWith(NATIVE_FILTER_PREFIX)) {
+      mergedDataMask[filter?.id] = filter;
+    }
+  });
+}
+
 const dataMaskReducer = produce(
   (draft: DataMaskStateWithId, action: AnyDataMaskAction) => {
     const cleanState = {};
@@ -114,7 +148,7 @@ const dataMaskReducer = produce(
       // TODO: update hydrate to .ts
       // @ts-ignore
       case HYDRATE_DASHBOARD:
-        if (isFeatureEnabled(FeatureFlag.DASHBOARD_CROSS_FILTERS)) {
+        if (isFeatureEnabled(FeatureFlag.DashboardCrossFilters)) {
           Object.keys(
             // @ts-ignore
             action.data.dashboardInfo?.metadata?.chart_configuration,
@@ -134,15 +168,14 @@ const dataMaskReducer = produce(
           action.data.dataMask,
         );
         return cleanState;
-      case SET_DATA_MASK_FOR_FILTER_CONFIG_COMPLETE:
-        fillNativeFilters(
-          action.filterConfig ?? [],
+      case SET_DATA_MASK_FOR_FILTER_CHANGES_COMPLETE:
+        updateDataMaskForFilterChanges(
+          action.filterChanges,
           cleanState,
           draft,
           action.filters,
         );
         return cleanState;
-
       default:
         return draft;
     }

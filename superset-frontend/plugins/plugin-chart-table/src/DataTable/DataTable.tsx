@@ -16,19 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React, {
+import {
   useCallback,
   useRef,
   ReactNode,
   HTMLProps,
   MutableRefObject,
   CSSProperties,
+  DragEvent,
 } from 'react';
+
 import {
   useTable,
   usePagination,
   useSortBy,
   useGlobalFilter,
+  useColumnOrder,
   PluginHook,
   TableOptions,
   FilterType,
@@ -36,6 +39,8 @@ import {
   Row,
 } from 'react-table';
 import { matchSorter, rankings } from 'match-sorter';
+import { typedMemo, usePrevious } from '@superset-ui/core';
+import { isEqual } from 'lodash';
 import GlobalFilter, { GlobalFilterProps } from './components/GlobalFilter';
 import SelectPageSize, {
   SelectPageSizeProps,
@@ -63,6 +68,9 @@ export interface DataTableProps<D extends object> extends TableOptions<D> {
   sticky?: boolean;
   rowCount: number;
   wrapperRef?: MutableRefObject<HTMLDivElement>;
+  onColumnOrderChange: () => void;
+  renderGroupingHeaders?: () => JSX.Element;
+  renderTimeComparisonDropdown?: () => JSX.Element;
 }
 
 export interface RenderHTMLCellProps extends HTMLProps<HTMLTableCellElement> {
@@ -74,7 +82,7 @@ const sortTypes = {
 };
 
 // Be sure to pass our updateMyData and the skipReset option
-export default function DataTable<D extends object>({
+export default typedMemo(function DataTable<D extends object>({
   tableClassName,
   columns,
   data,
@@ -94,20 +102,27 @@ export default function DataTable<D extends object>({
   hooks,
   serverPagination,
   wrapperRef: userWrapperRef,
+  onColumnOrderChange,
+  renderGroupingHeaders,
+  renderTimeComparisonDropdown,
   ...moreUseTableOptions
 }: DataTableProps<D>): JSX.Element {
   const tableHooks: PluginHook<D>[] = [
     useGlobalFilter,
     useSortBy,
     usePagination,
+    useColumnOrder,
     doSticky ? useSticky : [],
     hooks || [],
   ].flat();
+  const columnNames = Object.keys(data?.[0] || {});
+  const previousColumnNames = usePrevious(columnNames);
   const resultsSize = serverPagination ? rowCount : data.length;
   const sortByRef = useRef([]); // cache initial `sortby` so sorting doesn't trigger page reset
   const pageSizeRef = useRef([initialPageSize, resultsSize]);
   const hasPagination = initialPageSize > 0 && resultsSize > 0; // pageSize == 0 means no pagination
-  const hasGlobalControl = hasPagination || !!searchInput;
+  const hasGlobalControl =
+    hasPagination || !!searchInput || renderTimeComparisonDropdown;
   const initialState = {
     ...initialState_,
     // zero length means all pages, the `usePagination` plugin does not
@@ -124,7 +139,7 @@ export default function DataTable<D extends object>({
   const defaultGetTableSize = useCallback(() => {
     if (wrapperRef.current) {
       // `initialWidth` and `initialHeight` could be also parameters like `100%`
-      // `Number` reaturns `NaN` on them, then we fallback to computed size
+      // `Number` returns `NaN` on them, then we fallback to computed size
       const width = Number(initialWidth) || wrapperRef.current.clientWidth;
       const height =
         (Number(initialHeight) || wrapperRef.current.clientHeight) -
@@ -171,6 +186,8 @@ export default function DataTable<D extends object>({
     setGlobalFilter,
     setPageSize: setPageSize_,
     wrapStickyTable,
+    setColumnOrder,
+    allColumns,
     state: { pageIndex, pageSize, globalFilter: filterValue, sticky = {} },
   } = useTable<D>(
     {
@@ -180,6 +197,7 @@ export default function DataTable<D extends object>({
       getTableSize: defaultGetTableSize,
       globalFilter: defaultGlobalFilter,
       sortTypes,
+      autoResetSortBy: !isEqual(columnNames, previousColumnNames),
       ...moreUseTableOptions,
     },
     ...tableHooks,
@@ -210,9 +228,37 @@ export default function DataTable<D extends object>({
 
   const shouldRenderFooter = columns.some(x => !!x.Footer);
 
+  let columnBeingDragged = -1;
+
+  const onDragStart = (e: DragEvent) => {
+    const el = e.target as HTMLTableCellElement;
+    columnBeingDragged = allColumns.findIndex(
+      col => col.id === el.dataset.columnName,
+    );
+    e.dataTransfer.setData('text/plain', `${columnBeingDragged}`);
+  };
+
+  const onDrop = (e: DragEvent) => {
+    const el = e.target as HTMLTableCellElement;
+    const newPosition = allColumns.findIndex(
+      col => col.id === el.dataset.columnName,
+    );
+
+    if (newPosition !== -1) {
+      const currentCols = allColumns.map(c => c.id);
+      const colToBeMoved = currentCols.splice(columnBeingDragged, 1);
+      currentCols.splice(newPosition, 0, colToBeMoved[0]);
+      setColumnOrder(currentCols);
+      // toggle value in TableChart to trigger column width recalc
+      onColumnOrderChange();
+    }
+    e.preventDefault();
+  };
+
   const renderTable = () => (
     <table {...getTableProps({ className: tableClassName })}>
       <thead>
+        {renderGroupingHeaders ? renderGroupingHeaders() : null}
         {headerGroups.map(headerGroup => {
           const { key: headerGroupKey, ...headerGroupProps } =
             headerGroup.getHeaderGroupProps();
@@ -222,6 +268,8 @@ export default function DataTable<D extends object>({
                 column.render('Header', {
                   key: column.id,
                   ...column.getSortByToggleProps(),
+                  onDragStart,
+                  onDrop,
                 }),
               )}
             </tr>
@@ -234,7 +282,7 @@ export default function DataTable<D extends object>({
             prepareRow(row);
             const { key: rowKey, ...rowProps } = row.getRowProps();
             return (
-              <tr key={rowKey || row.id} {...rowProps}>
+              <tr key={rowKey || row.id} {...rowProps} role="row">
                 {row.cells.map(cell =>
                   cell.render('Cell', { key: cell.column.id }),
                 )}
@@ -255,7 +303,11 @@ export default function DataTable<D extends object>({
             const { key: footerGroupKey, ...footerGroupProps } =
               footerGroup.getHeaderGroupProps();
             return (
-              <tr key={footerGroupKey || footerGroup.id} {...footerGroupProps}>
+              <tr
+                key={footerGroupKey || footerGroup.id}
+                {...footerGroupProps}
+                role="row"
+              >
                 {footerGroup.headers.map(column =>
                   column.render('Footer', { key: column.id }),
                 )}
@@ -287,7 +339,7 @@ export default function DataTable<D extends object>({
   let resultCurrentPage = pageIndex;
   let resultOnPageChange: (page: number) => void = gotoPage;
   if (serverPagination) {
-    const serverPageSize = serverPaginationData.pageSize ?? initialPageSize;
+    const serverPageSize = serverPaginationData?.pageSize ?? initialPageSize;
     resultPageCount = Math.ceil(rowCount / serverPageSize);
     if (!Number.isFinite(resultPageCount)) {
       resultPageCount = 0;
@@ -299,7 +351,7 @@ export default function DataTable<D extends object>({
     if (foundPageSizeIndex === -1) {
       resultCurrentPageSize = 0;
     }
-    resultCurrentPage = serverPaginationData.currentPage ?? 0;
+    resultCurrentPage = serverPaginationData?.currentPage ?? 0;
     resultOnPageChange = (pageNumber: number) =>
       onServerPaginationChange(pageNumber, serverPageSize);
   }
@@ -311,7 +363,9 @@ export default function DataTable<D extends object>({
       {hasGlobalControl ? (
         <div ref={globalControlRef} className="form-inline dt-controls">
           <div className="row">
-            <div className="col-sm-6">
+            <div
+              className={renderTimeComparisonDropdown ? 'col-sm-5' : 'col-sm-6'}
+            >
               {hasPagination ? (
                 <SelectPageSize
                   total={resultsSize}
@@ -338,6 +392,14 @@ export default function DataTable<D extends object>({
                 />
               </div>
             ) : null}
+            {renderTimeComparisonDropdown ? (
+              <div
+                className="col-sm-1"
+                style={{ float: 'right', marginTop: '6px' }}
+              >
+                {renderTimeComparisonDropdown()}
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -354,4 +416,4 @@ export default function DataTable<D extends object>({
       ) : null}
     </div>
   );
-}
+});

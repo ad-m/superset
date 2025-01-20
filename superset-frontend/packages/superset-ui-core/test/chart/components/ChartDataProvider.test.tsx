@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import React from 'react';
+import { ReactNode } from 'react';
 import { shallow } from 'enzyme';
 import ChartClient from '../../../src/chart/clients/ChartClient';
 import ChartDataProvider, {
@@ -49,14 +49,13 @@ const mockLoadQueryData = jest.fn<Promise<unknown>, unknown[]>(
   createArrayPromise,
 );
 
+const actual = jest.requireActual('../../../src/chart/clients/ChartClient');
 // ChartClient is now a mock
-jest.mock('../../../src/chart/clients/ChartClient', () =>
-  jest.fn().mockImplementation(() => ({
-    loadDatasource: mockLoadDatasource,
-    loadFormData: mockLoadFormData,
-    loadQueryData: mockLoadQueryData,
-  })),
-);
+jest.spyOn(actual, 'default').mockImplementation(() => ({
+  loadDatasource: mockLoadDatasource,
+  loadFormData: mockLoadFormData,
+  loadQueryData: mockLoadQueryData,
+}));
 
 const ChartClientMock = ChartClient as jest.Mock<ChartClient>;
 
@@ -119,7 +118,7 @@ describe('ChartDataProvider', () => {
         setup({ loadDatasource: false });
         setTimeout(() => {
           expect(mockLoadDatasource.mock.calls).toHaveLength(0);
-          done();
+          done(undefined);
         }, 0);
       }));
 
@@ -132,7 +131,7 @@ describe('ChartDataProvider', () => {
           expect(mockLoadDatasource.mock.calls[0][0]).toEqual(
             props.formData.datasource,
           );
-          done();
+          done(undefined);
         }, 0);
       }));
 
@@ -144,7 +143,7 @@ describe('ChartDataProvider', () => {
         setTimeout(() => {
           expect(mockLoadDatasource.mock.calls).toHaveLength(1);
           expect(mockLoadDatasource.mock.calls[0][1]).toEqual(options);
-          done();
+          done(undefined);
         }, 0);
       }));
 
@@ -164,7 +163,7 @@ describe('ChartDataProvider', () => {
             props.formData.datasource,
           );
           expect(mockLoadDatasource.mock.calls[1][0]).toEqual(newDatasource);
-          done();
+          done(undefined);
         }, 0);
       }));
   });
@@ -177,7 +176,7 @@ describe('ChartDataProvider', () => {
         setTimeout(() => {
           expect(mockLoadQueryData.mock.calls).toHaveLength(1);
           expect(mockLoadQueryData.mock.calls[0][0]).toEqual(props.formData);
-          done();
+          done(undefined);
         }, 0);
       }));
 
@@ -189,7 +188,7 @@ describe('ChartDataProvider', () => {
         setTimeout(() => {
           expect(mockLoadQueryData.mock.calls).toHaveLength(1);
           expect(mockLoadQueryData.mock.calls[0][1]).toEqual(options);
-          done();
+          done(undefined);
         }, 0);
       }));
 
@@ -204,14 +203,14 @@ describe('ChartDataProvider', () => {
           expect(mockLoadQueryData.mock.calls).toHaveLength(2);
           expect(mockLoadQueryData.mock.calls[0][0]).toEqual(props.formData);
           expect(mockLoadQueryData.mock.calls[1][0]).toEqual(newFormData);
-          done();
+          done(undefined);
         }, 0);
       }));
   });
 
   describe('children', () => {
     it('calls children({ loading: true }) when loading', () => {
-      const children = jest.fn<React.ReactNode, unknown[]>();
+      const children = jest.fn<ReactNode, unknown[]>();
       setup({ children });
 
       // during the first tick (before more promises resolve) loading is true
@@ -222,7 +221,7 @@ describe('ChartDataProvider', () => {
     it('calls children({ payload }) when loaded', () =>
       new Promise(done => {
         expect.assertions(2);
-        const children = jest.fn<React.ReactNode, unknown[]>();
+        const children = jest.fn<ReactNode, unknown[]>();
         setup({ children, loadDatasource: true });
 
         setTimeout(() => {
@@ -234,14 +233,14 @@ describe('ChartDataProvider', () => {
               queriesData: [props.formData],
             },
           });
-          done();
+          done(undefined);
         }, 0);
       }));
 
     it('calls children({ error }) upon request error', () =>
       new Promise(done => {
         expect.assertions(2);
-        const children = jest.fn<React.ReactNode, unknown[]>();
+        const children = jest.fn<ReactNode, unknown[]>();
         mockLoadFormData = jest.fn(() => Promise.reject(new Error('error')));
 
         setup({ children });
@@ -251,14 +250,14 @@ describe('ChartDataProvider', () => {
           expect(children.mock.calls[1][0]).toEqual({
             error: new Error('error'),
           });
-          done();
+          done(undefined);
         }, 0);
       }));
 
     it('calls children({ error }) upon JS error', () =>
       new Promise(done => {
         expect.assertions(2);
-        const children = jest.fn<React.ReactNode, unknown[]>();
+        const children = jest.fn<ReactNode, unknown[]>();
 
         mockLoadFormData = jest.fn(() => {
           throw new Error('non-async error');
@@ -271,7 +270,7 @@ describe('ChartDataProvider', () => {
           expect(children.mock.calls[1][0]).toEqual({
             error: new Error('non-async error'),
           });
-          done();
+          done(undefined);
         }, 0);
       }));
   });
@@ -290,7 +289,7 @@ describe('ChartDataProvider', () => {
             datasource: props.formData.datasource,
             queriesData: [props.formData],
           });
-          done();
+          done(undefined);
         }, 0);
       }));
 
@@ -304,7 +303,7 @@ describe('ChartDataProvider', () => {
         setTimeout(() => {
           expect(onError.mock.calls).toHaveLength(1);
           expect(onError.mock.calls[0][0]).toEqual(new Error('error'));
-          done();
+          done(undefined);
         }, 0);
       }));
 
@@ -323,7 +322,7 @@ describe('ChartDataProvider', () => {
           expect(onError.mock.calls[0][0]).toEqual(
             new Error('non-async error'),
           );
-          done();
+          done(undefined);
         }, 0);
       }));
   });

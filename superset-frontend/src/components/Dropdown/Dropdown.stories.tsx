@@ -16,8 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React from 'react';
-import { Menu } from 'src/common/components';
+import { Menu } from 'src/components/Menu';
 import { Dropdown, DropdownProps } from '.';
 
 export default {
@@ -61,14 +60,7 @@ export const InteractiveDropdown = ({
 InteractiveDropdown.argTypes = {
   overlayType: {
     defaultValue: 'menu',
-    control: { type: 'radio', options: ['menu', 'custom'] },
-  },
-};
-
-InteractiveDropdown.story = {
-  parameters: {
-    knobs: {
-      disable: true,
-    },
+    control: { type: 'radio' },
+    options: ['menu', 'custom'],
   },
 };

@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React from 'react';
 import { ReactWrapper } from 'enzyme';
 import { styledMount as mount } from 'spec/helpers/theming';
 import { act } from 'react-dom/test-utils';
@@ -95,8 +94,8 @@ describe('VerifiedMetricsControl', () => {
 
     expect(wrapper.find(MetricsControl).length).toBe(1);
 
-    expect(verifier).toBeCalledTimes(1);
-    expect(verifier).toBeCalledWith(
+    expect(verifier).toHaveBeenCalledTimes(1);
+    expect(verifier).toHaveBeenCalledWith(
       expect.objectContaining({ savedMetrics: props.savedMetrics }),
     );
 
@@ -105,8 +104,8 @@ describe('VerifiedMetricsControl', () => {
       wrapper.setProps({ validMetric: ['abc'] });
     });
 
-    expect(verifier).toBeCalledTimes(2);
-    expect(verifier).toBeCalledWith(
+    expect(verifier).toHaveBeenCalledTimes(2);
+    expect(verifier).toHaveBeenCalledWith(
       expect.objectContaining({ validMetric: ['abc'] }),
     );
   });
@@ -124,8 +123,8 @@ describe('VerifiedMetricsControl', () => {
     child.props().onChange?.(['abc']);
 
     expect(child.length).toBe(1);
-    expect(mockOnChange).toBeCalledTimes(1);
-    expect(mockOnChange).toBeCalledWith(['abc'], {
+    expect(mockOnChange).toHaveBeenCalledTimes(1);
+    expect(mockOnChange).toHaveBeenCalledWith(['abc'], {
       actions: defaultProps.actions,
       columns: defaultProps.columns,
       datasourceType: defaultProps.datasourceType,
@@ -133,7 +132,7 @@ describe('VerifiedMetricsControl', () => {
       multi: defaultProps.multi,
       name: defaultProps.name,
       // in real life, `onChange` should have been called with the updated
-      // props (both savedMetrics and value should have beend updated), but
+      // props (both savedMetrics and value should have been updated), but
       // because of the limitation of enzyme (it cannot get props updated from
       // useEffect hooks), we are not able to check that here.
       savedMetrics: defaultProps.savedMetrics,

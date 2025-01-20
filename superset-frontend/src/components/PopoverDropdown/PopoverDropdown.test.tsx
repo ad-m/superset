@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React from 'react';
 import { render, screen } from 'spec/helpers/testing-library';
 import userEvent from '@testing-library/user-event';
 import PopoverDropdown, {
@@ -36,19 +35,19 @@ const defaultProps: PopoverDropdownProps = {
   onChange: jest.fn(),
 };
 
-test('renders with default props', () => {
+test('renders with default props', async () => {
   render(<PopoverDropdown {...defaultProps} />);
-  expect(screen.getByRole('button')).toBeInTheDocument();
+  expect(await screen.findByRole('button')).toBeInTheDocument();
   expect(screen.getByRole('button')).toHaveTextContent('Option 1');
 });
 
-test('renders the menu on click', () => {
+test('renders the menu on click', async () => {
   render(<PopoverDropdown {...defaultProps} />);
   userEvent.click(screen.getByRole('button'));
-  expect(screen.getByRole('menu')).toBeInTheDocument();
+  expect(await screen.findByRole('menu')).toBeInTheDocument();
 });
 
-test('renders with custom button', () => {
+test('renders with custom button', async () => {
   render(
     <PopoverDropdown
       {...defaultProps}
@@ -59,10 +58,10 @@ test('renders with custom button', () => {
       )}
     />,
   );
-  expect(screen.getByText('Custom Option 1')).toBeInTheDocument();
+  expect(await screen.findByText('Custom Option 1')).toBeInTheDocument();
 });
 
-test('renders with custom option', () => {
+test('renders with custom option', async () => {
   render(
     <PopoverDropdown
       {...defaultProps}
@@ -74,13 +73,13 @@ test('renders with custom option', () => {
     />,
   );
   userEvent.click(screen.getByRole('button'));
-  expect(screen.getByText('Custom Option 1')).toBeInTheDocument();
+  expect(await screen.findByText('Custom Option 1')).toBeInTheDocument();
 });
 
-test('triggers onChange', () => {
+test('triggers onChange', async () => {
   render(<PopoverDropdown {...defaultProps} />);
   userEvent.click(screen.getByRole('button'));
-  expect(screen.getByText('Option 2')).toBeInTheDocument();
+  expect(await screen.findByText('Option 2')).toBeInTheDocument();
   userEvent.click(screen.getByText('Option 2'));
   expect(defaultProps.onChange).toHaveBeenCalled();
 });

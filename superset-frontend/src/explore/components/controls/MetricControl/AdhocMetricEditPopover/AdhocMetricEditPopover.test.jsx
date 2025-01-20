@@ -16,8 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-/* eslint-disable no-unused-expressions */
-import React from 'react';
 import sinon from 'sinon';
 import { shallow } from 'enzyme';
 import { FormItem } from 'src/components/Form';
@@ -49,10 +47,11 @@ const sqlExpressionAdhocMetric = new AdhocMetric({
 function setup(overrides) {
   const onChange = sinon.spy();
   const onClose = sinon.spy();
+  const savedMetric = { metric_name: 'foo', expression: 'COUNT(*)' };
   const props = {
     adhocMetric: sumValueAdhocMetric,
-    savedMetric: { metric_name: 'foo', expression: 'COUNT(*)' },
-    savedMetrics: [],
+    savedMetric,
+    savedMetricsOptions: [savedMetric],
     onChange,
     onClose,
     onResize: () => {},
@@ -97,7 +96,7 @@ describe('AdhocMetricEditPopover', () => {
 
   it('prevents saving if no column or aggregate is chosen', () => {
     const { wrapper } = setup();
-    expect(wrapper.find(Button).find({ disabled: true })).not.toExist();
+    expect(wrapper.find(Button).find({ disabled: false })).not.toExist();
     wrapper.instance().onColumnChange(null);
     expect(wrapper.find(Button).find({ disabled: true })).toExist();
     wrapper.instance().onColumnChange(columns[0].column_name);
@@ -108,9 +107,9 @@ describe('AdhocMetricEditPopover', () => {
 
   it('highlights save if changes are present', () => {
     const { wrapper } = setup();
-    expect(wrapper.find(Button).find({ buttonStyle: 'primary' })).not.toExist();
+    expect(wrapper.find(Button).find({ disabled: true })).toExist();
     wrapper.instance().onColumnChange(columns[1].column_name);
-    expect(wrapper.find(Button).find({ buttonStyle: 'primary' })).toExist();
+    expect(wrapper.find(Button).find({ disabled: true })).not.toExist();
   });
 
   it('will initiate a drag when clicked', () => {
