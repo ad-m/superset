@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React from 'react';
 import { reactify, styled } from '@superset-ui/core';
 import PropTypes from 'prop-types';
 import Component from './NVD3Vis';
@@ -63,7 +62,7 @@ export default styled(NVD3)`
     }
     .nvtooltip tr.highlight td {
       font-weight: ${({ theme }) => theme.typography.weights.bold};
-      font-size: 15px !important;
+      font-size: ${({ theme }) => theme.typography.sizes.m}px !important;
     }
     text.nv-axislabel {
       font-size: ${({ theme }) => theme.typography.sizes.m} !important;
@@ -152,7 +151,7 @@ export default styled(NVD3)`
       white-space: nowrap;
       font-weight: ${({ theme }) => theme.typography.weights.bold};
     }
-    tbody tr:not(.tooltip-header) td:nth-child(2) {
+    tbody tr:not(.tooltip-header) td:nth-of-type(2) {
       word-break: break-word;
     }
   }
@@ -160,15 +159,15 @@ export default styled(NVD3)`
   .d3-tip.nv-event-annotation-layer-NATIVE {
     width: 200px;
     border-radius: 2px;
-    background-color: #484848;
+    background-color: ${({ theme }) => theme.colors.grayscale.base};
     fill-opacity: 0.6;
-    margin: 8px;
-    padding: 8px;
-    color: #fff;
+    margin: ${({ theme }) => theme.gridUnit * 2}px;
+    padding: ${({ theme }) => theme.gridUnit * 2}px;
+    color: ${({ theme }) => theme.colors.grayscale.light5};
     &:after {
       content: '\\25BC';
       font-size: ${({ theme }) => theme.typography.sizes.m};
-      color: #484848;
+      color: ${({ theme }) => theme.colors.grayscale.base};
       position: absolute;
       bottom: -14px;
       left: 94px;

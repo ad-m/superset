@@ -16,18 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { ChartProps } from '@superset-ui/core';
-import transformProps from '../../src/Gauge/transformProps';
-import { DEFAULT_GAUGE_SERIES_OPTION } from '../../src/Gauge/constants';
+import {
+  CategoricalColorNamespace,
+  ChartProps,
+  SqlaFormData,
+  supersetTheme,
+  VizType,
+} from '@superset-ui/core';
+import transformProps, {
+  getIntervalBoundsAndColors,
+} from '../../src/Gauge/transformProps';
+import { EchartsGaugeChartProps } from '../../src/Gauge/types';
 
 describe('Echarts Gauge transformProps', () => {
-  const baseFormData = {
+  const baseFormData: SqlaFormData = {
     datasource: '26__table',
-    vizType: 'gauge_chart',
+    viz_type: VizType.Gauge,
     metric: 'count',
     adhocFilters: [],
     rowLimit: 10,
-    minVal: '0',
+    minVal: 0,
     maxVal: 100,
     startAngle: 225,
     endAngle: -45,
@@ -46,7 +54,7 @@ describe('Echarts Gauge transformProps', () => {
   };
 
   it('should transform chart props for no group by column', () => {
-    const formData = { ...baseFormData, groupby: [] };
+    const formData: SqlaFormData = { ...baseFormData, groupby: [] };
     const queriesData = [
       {
         colnames: ['count'],
@@ -63,10 +71,11 @@ describe('Echarts Gauge transformProps', () => {
       width: 800,
       height: 600,
       queriesData,
+      theme: supersetTheme,
     };
 
     const chartProps = new ChartProps(chartPropsConfig);
-    expect(transformProps(chartProps)).toEqual(
+    expect(transformProps(chartProps as EchartsGaugeChartProps)).toEqual(
       expect.objectContaining({
         width: 800,
         height: 600,
@@ -98,7 +107,10 @@ describe('Echarts Gauge transformProps', () => {
   });
 
   it('should transform chart props for single group by column', () => {
-    const formData = { ...baseFormData, groupby: ['year'] };
+    const formData: SqlaFormData = {
+      ...baseFormData,
+      groupby: ['year'],
+    };
     const queriesData = [
       {
         colnames: ['year', 'count'],
@@ -120,10 +132,11 @@ describe('Echarts Gauge transformProps', () => {
       width: 800,
       height: 600,
       queriesData,
+      theme: supersetTheme,
     };
 
     const chartProps = new ChartProps(chartPropsConfig);
-    expect(transformProps(chartProps)).toEqual(
+    expect(transformProps(chartProps as EchartsGaugeChartProps)).toEqual(
       expect.objectContaining({
         width: 800,
         height: 600,
@@ -170,7 +183,10 @@ describe('Echarts Gauge transformProps', () => {
   });
 
   it('should transform chart props for multiple group by columns', () => {
-    const formData = { ...baseFormData, groupby: ['year', 'platform'] };
+    const formData: SqlaFormData = {
+      ...baseFormData,
+      groupby: ['year', 'platform'],
+    };
     const queriesData = [
       {
         colnames: ['year', 'platform', 'count'],
@@ -194,10 +210,11 @@ describe('Echarts Gauge transformProps', () => {
       width: 800,
       height: 600,
       queriesData,
+      theme: supersetTheme,
     };
 
     const chartProps = new ChartProps(chartPropsConfig);
-    expect(transformProps(chartProps)).toEqual(
+    expect(transformProps(chartProps as EchartsGaugeChartProps)).toEqual(
       expect.objectContaining({
         width: 800,
         height: 600,
@@ -244,11 +261,12 @@ describe('Echarts Gauge transformProps', () => {
   });
 
   it('should transform chart props for intervals', () => {
-    const formData = {
+    const formData: SqlaFormData = {
       ...baseFormData,
       groupby: ['year', 'platform'],
-      intervals: '50,100',
+      intervals: '60,100',
       intervalColorIndices: '1,2',
+      minVal: 20,
     };
     const queriesData = [
       {
@@ -273,10 +291,11 @@ describe('Echarts Gauge transformProps', () => {
       width: 800,
       height: 600,
       queriesData,
+      theme: supersetTheme,
     };
 
     const chartProps = new ChartProps(chartPropsConfig);
-    expect(transformProps(chartProps)).toEqual(
+    expect(transformProps(chartProps as EchartsGaugeChartProps)).toEqual(
       expect.objectContaining({
         width: 800,
         height: 600,
@@ -330,5 +349,45 @@ describe('Echarts Gauge transformProps', () => {
         }),
       }),
     );
+  });
+});
+
+describe('getIntervalBoundsAndColors', () => {
+  it('should generate correct interval bounds and colors', () => {
+    const colorFn = CategoricalColorNamespace.getScale(
+      'supersetColors' as string,
+    );
+    expect(getIntervalBoundsAndColors('', '', colorFn, 0, 10)).toEqual([]);
+    expect(getIntervalBoundsAndColors('4, 10', '1, 2', colorFn, 0, 10)).toEqual(
+      [
+        [0.4, '#1f77b4'],
+        [1, '#ff7f0e'],
+      ],
+    );
+    expect(
+      getIntervalBoundsAndColors('4, 8, 10', '9, 8, 7', colorFn, 0, 10),
+    ).toEqual([
+      [0.4, '#bcbd22'],
+      [0.8, '#7f7f7f'],
+      [1, '#e377c2'],
+    ]);
+    expect(getIntervalBoundsAndColors('4, 10', '1, 2', colorFn, 2, 10)).toEqual(
+      [
+        [0.25, '#1f77b4'],
+        [1, '#ff7f0e'],
+      ],
+    );
+    expect(
+      getIntervalBoundsAndColors('-4, 0', '1, 2', colorFn, -10, 0),
+    ).toEqual([
+      [0.6, '#1f77b4'],
+      [1, '#ff7f0e'],
+    ]);
+    expect(
+      getIntervalBoundsAndColors('-4, -2', '1, 2', colorFn, -10, -2),
+    ).toEqual([
+      [0.75, '#1f77b4'],
+      [1, '#ff7f0e'],
+    ]);
   });
 });

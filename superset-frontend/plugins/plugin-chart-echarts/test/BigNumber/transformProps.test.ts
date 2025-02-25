@@ -16,11 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { DatasourceType, TimeGranularity } from '@superset-ui/core';
+import {
+  DatasourceType,
+  supersetTheme,
+  TimeGranularity,
+  VizType,
+} from '@superset-ui/core';
 import transformProps from '../../src/BigNumber/BigNumberWithTrendline/transformProps';
 import {
   BigNumberDatum,
   BigNumberWithTrendlineChartProps,
+  BigNumberWithTrendlineFormData,
 } from '../../src/BigNumber/types';
 
 const formData = {
@@ -32,14 +38,17 @@ const formData = {
     a: 1,
   },
   compareLag: 1,
-  timeGrainSqla: 'P3M' as TimeGranularity,
+  timeGrainSqla: TimeGranularity.QUARTER,
+  granularitySqla: 'ds',
   compareSuffix: 'over last quarter',
-  viz_type: 'big_number',
+  viz_type: VizType.BigNumber,
   yAxisFormat: '.3s',
   datasource: 'test_datasource',
 };
 
-const rawFormData = {
+const rawFormData: BigNumberWithTrendlineFormData = {
+  colorPicker: { b: 0, g: 0, r: 0 },
+  datasource: '1__table',
   metric: 'value',
   color_picker: {
     r: 0,
@@ -48,16 +57,17 @@ const rawFormData = {
     a: 1,
   },
   compare_lag: 1,
-  time_grain_sqla: 'P3M' as TimeGranularity,
+  time_grain_sqla: TimeGranularity.QUARTER,
+  granularity_sqla: 'ds',
   compare_suffix: 'over last quarter',
-  viz_type: 'big_number',
+  viz_type: VizType.BigNumber,
   y_axis_format: '.3s',
 };
 
 function generateProps(
   data: BigNumberDatum[],
   extraFormData = {},
-  extraQueryData = {},
+  extraQueryData: any = {},
 ): BigNumberWithTrendlineChartProps {
   return {
     width: 200,
@@ -89,6 +99,7 @@ function generateProps(
     ownState: {},
     filterState: {},
     behaviors: [],
+    theme: supersetTheme,
   };
 }
 
@@ -121,7 +132,8 @@ describe('BigNumberWithTrendline', () => {
       expect(transformed.bigNumber).toStrictEqual(1.2345);
       expect(transformed.bigNumberFallback).not.toBeNull();
 
-      // should successfully formatTime by ganularity
+      // should successfully formatTime by granularity
+      // @ts-ignore
       expect(transformed.formatTime(new Date('2020-01-01'))).toStrictEqual(
         '2020-01-01 00:00:00',
       );
@@ -142,8 +154,34 @@ describe('BigNumberWithTrendline', () => {
         },
       };
       const transformed = transformProps(propsWithDatasource);
+      // @ts-ignore
       expect(transformed.headerFormatter(transformed.bigNumber)).toStrictEqual(
         '1.23',
+      );
+    });
+
+    it('should format with datasource currency', () => {
+      const propsWithDatasource = {
+        ...props,
+        datasource: {
+          ...props.datasource,
+          currencyFormats: {
+            value: { symbol: 'USD', symbolPosition: 'prefix' },
+          },
+          metrics: [
+            {
+              label: 'value',
+              metric_name: 'value',
+              d3format: '.2f',
+              currency: { symbol: 'USD', symbolPosition: 'prefix' },
+            },
+          ],
+        },
+      };
+      const transformed = transformProps(propsWithDatasource);
+      // @ts-ignore
+      expect(transformed.headerFormatter(transformed.bigNumber)).toStrictEqual(
+        '$ 1.23',
       );
     });
   });

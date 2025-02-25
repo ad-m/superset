@@ -16,9 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { NativeFilterType } from 'src/dashboard/components/nativeFilters/types';
-import { NativeFiltersState } from 'src/dashboard/reducers/types';
-import { DataMaskStateWithId } from 'src/dataMask/types';
+import {
+  DataMaskStateWithId,
+  NativeFiltersState,
+  NativeFilterType,
+} from '@superset-ui/core';
 
 export const mockDataMaskInfo: DataMaskStateWithId = {
   DefaultsID: {
@@ -31,20 +33,13 @@ export const mockDataMaskInfo: DataMaskStateWithId = {
 };
 
 export const nativeFiltersInfo: NativeFiltersState = {
-  filterSets: {
-    '1': {
-      id: 1,
-      name: 'Set name',
-      nativeFilters: {},
-      dataMask: mockDataMaskInfo,
-    },
-  },
   filters: {
     DefaultsID: {
       cascadeParentIds: [],
       id: 'DefaultsID',
       name: 'test',
       filterType: 'filter_select',
+      chartsInScope: [],
       targets: [
         {
           datasetId: 0,
@@ -67,7 +62,7 @@ export const nativeFiltersInfo: NativeFiltersState = {
         allowsMultipleValues: true,
         isRequired: false,
       },
-      type: NativeFilterType.NATIVE_FILTER,
+      type: NativeFilterType.NativeFilter,
       description: 'test description',
     },
   },

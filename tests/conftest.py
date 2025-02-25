@@ -28,7 +28,7 @@ from __future__ import annotations
 from typing import Callable, TYPE_CHECKING
 from unittest.mock import MagicMock, Mock, PropertyMock
 
-from pytest import fixture
+from pytest import fixture  # noqa: PT013
 
 from tests.example_data.data_loading.pandas.pandas_data_loader import PandasDataLoader
 from tests.example_data.data_loading.pandas.pands_data_loading_conf import (
@@ -37,6 +37,7 @@ from tests.example_data.data_loading.pandas.pands_data_loading_conf import (
 from tests.example_data.data_loading.pandas.table_df_convertor import (
     TableToDfConvertorImpl,
 )
+from tests.integration_tests.test_app import app
 
 SUPPORT_DATETIME_TYPE = "support_datetime_type"
 
@@ -67,11 +68,15 @@ def example_db_provider() -> Callable[[], Database]:
 
 @fixture(scope="session")
 def example_db_engine(example_db_provider: Callable[[], Database]) -> Engine:
-    return example_db_provider().get_sqla_engine()
+    with app.app_context():
+        with example_db_provider().get_sqla_engine() as engine:
+            return engine
 
 
 @fixture(scope="session")
-def pandas_loader_configuration(support_datetime_type,) -> PandasLoaderConfigurations:
+def pandas_loader_configuration(
+    support_datetime_type,
+) -> PandasLoaderConfigurations:
     return PandasLoaderConfigurations.make_from_dict(
         {SUPPORT_DATETIME_TYPE: support_datetime_type}
     )

@@ -17,13 +17,14 @@
  * under the License.
  */
 /* eslint-env browser */
-import React from 'react';
+import { createRef, PureComponent } from 'react';
 import { Radio } from 'src/components/Radio';
-import { RadioChangeEvent, Input } from 'src/common/components';
+import { RadioChangeEvent } from 'src/components';
+import { Input } from 'src/components/Input';
 import Button from 'src/components/Button';
 import { t, JsonResponse } from '@superset-ui/core';
 
-import ModalTrigger from 'src/components/ModalTrigger';
+import ModalTrigger, { ModalTriggerRef } from 'src/components/ModalTrigger';
 import Checkbox from 'src/components/Checkbox';
 import {
   SAVE_TYPE_OVERWRITE,
@@ -65,10 +66,10 @@ const defaultProps = {
   shouldPersistRefreshFrequency: false,
 };
 
-class SaveModal extends React.PureComponent<SaveModalProps, SaveModalState> {
+class SaveModal extends PureComponent<SaveModalProps, SaveModalState> {
   static defaultProps = defaultProps;
 
-  modal: ModalTrigger | null;
+  modal: ModalTriggerRef | null;
 
   onSave: (
     data: Record<string, any>,
@@ -80,20 +81,16 @@ class SaveModal extends React.PureComponent<SaveModalProps, SaveModalState> {
     super(props);
     this.state = {
       saveType: props.saveType,
-      newDashName: `${props.dashboardTitle} [copy]`,
+      newDashName: `${props.dashboardTitle} ${t('[copy]')}`,
       duplicateSlices: false,
     };
-    this.modal = null;
+
     this.handleSaveTypeChange = this.handleSaveTypeChange.bind(this);
     this.handleNameChange = this.handleNameChange.bind(this);
     this.saveDashboard = this.saveDashboard.bind(this);
-    this.setModalRef = this.setModalRef.bind(this);
     this.toggleDuplicateSlices = this.toggleDuplicateSlices.bind(this);
     this.onSave = this.props.onSave.bind(this);
-  }
-
-  setModalRef(ref: ModalTrigger | null) {
-    this.modal = ref;
+    this.modal = createRef() as ModalTriggerRef;
   }
 
   toggleDuplicateSlices(): void {
@@ -156,23 +153,18 @@ class SaveModal extends React.PureComponent<SaveModalProps, SaveModalState> {
       );
     } else {
       this.onSave(data, dashboardId, saveType).then((resp: JsonResponse) => {
-        if (
-          saveType === SAVE_TYPE_NEWDASHBOARD &&
-          resp &&
-          resp.json &&
-          resp.json.id
-        ) {
-          window.location.href = `/superset/dashboard/${resp.json.id}/`;
+        if (saveType === SAVE_TYPE_NEWDASHBOARD && resp.json?.result?.id) {
+          window.location.href = `/superset/dashboard/${resp.json.result.id}/`;
         }
       });
-      this.modal?.close();
+      this.modal?.current?.close?.();
     }
   }
 
   render() {
     return (
       <ModalTrigger
-        ref={this.setModalRef}
+        ref={this.modal}
         triggerNode={this.props.triggerNode}
         modalTitle={t('Save dashboard')}
         modalBody={

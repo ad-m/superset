@@ -21,33 +21,21 @@ import { Dispatch } from 'react';
 import {
   setFocusedNativeFilter,
   unsetFocusedNativeFilter,
+  setHoveredNativeFilter,
+  unsetHoveredNativeFilter,
 } from 'src/dashboard/actions/nativeFilters';
-import { Filter, NativeFilterType, Divider } from '../../types';
-import { CascadeFilter } from '../CascadeFilters/types';
-import { mapParentFiltersToChildren } from '../utils';
+import { FAST_DEBOUNCE } from 'src/constants';
 
-// eslint-disable-next-line import/prefer-default-export
-export function buildCascadeFiltersTree(
-  filters: Array<Divider | Filter>,
-): Array<CascadeFilter | Divider> {
-  const cascadeChildren = mapParentFiltersToChildren(filters);
-
-  const getCascadeFilter = (filter: Filter): CascadeFilter => {
-    const children = cascadeChildren[filter.id] || [];
-    return {
-      ...filter,
-      cascadeChildren: children.map(getCascadeFilter),
-    };
-  };
-
-  return filters
-    .filter(
-      filter =>
-        filter.type === NativeFilterType.DIVIDER ||
-        !(filter as Filter).cascadeParentIds?.length,
-    )
-    .map(getCascadeFilter);
-}
+export const dispatchHoverAction = debounce(
+  (dispatch: Dispatch<any>, id?: string) => {
+    if (id) {
+      dispatch(setHoveredNativeFilter(id));
+    } else {
+      dispatch(unsetHoveredNativeFilter());
+    }
+  },
+  FAST_DEBOUNCE,
+);
 
 export const dispatchFocusAction = debounce(
   (dispatch: Dispatch<any>, id?: string) => {
@@ -57,5 +45,5 @@ export const dispatchFocusAction = debounce(
       dispatch(unsetFocusedNativeFilter());
     }
   },
-  300,
+  FAST_DEBOUNCE,
 );

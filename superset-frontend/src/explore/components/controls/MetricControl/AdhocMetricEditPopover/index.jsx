@@ -17,19 +17,24 @@
  * under the License.
  */
 /* eslint-disable camelcase */
-import React from 'react';
+import { PureComponent } from 'react';
 import PropTypes from 'prop-types';
+import {
+  isDefined,
+  t,
+  styled,
+  ensureIsArray,
+  DatasourceType,
+} from '@superset-ui/core';
 import Tabs from 'src/components/Tabs';
 import Button from 'src/components/Button';
 import { Select } from 'src/components';
 import { Tooltip } from 'src/components/Tooltip';
-import { t, styled } from '@superset-ui/core';
-
+import { EmptyState } from 'src/components/EmptyState';
 import { Form, FormItem } from 'src/components/Form';
 import { SQLEditor } from 'src/components/AsyncAceEditor';
 import sqlKeywords from 'src/SqlLab/utils/sqlKeywords';
 import { noOp } from 'src/utils/common';
-
 import {
   AGGREGATES_OPTIONS,
   POPOVER_INITIAL_HEIGHT,
@@ -44,6 +49,7 @@ import {
   StyledMetricOption,
   StyledColumnOption,
 } from 'src/explore/components/optionRenderers';
+import { getColumnKeywords } from 'src/explore/controlUtils/getColumnKeywords';
 
 const propTypes = {
   onChange: PropTypes.func.isRequired,
@@ -56,11 +62,14 @@ const propTypes = {
   savedMetricsOptions: PropTypes.arrayOf(savedMetricType),
   savedMetric: savedMetricType,
   datasource: PropTypes.object,
+  isNewMetric: PropTypes.bool,
+  isLabelModified: PropTypes.bool,
 };
 
 const defaultProps = {
   columns: [],
   getCurrentTab: noOp,
+  isNewMetric: false,
 };
 
 const StyledSelect = styled(Select)`
@@ -77,14 +86,9 @@ const StyledSelect = styled(Select)`
 
 export const SAVED_TAB_KEY = 'SAVED';
 
-export default class AdhocMetricEditPopover extends React.PureComponent {
+export default class AdhocMetricEditPopover extends PureComponent {
   // "Saved" is a default tab unless there are no saved metrics for dataset
-  defaultActiveTabKey =
-    (this.props.savedMetric.metric_name || this.props.adhocMetric.isNew) &&
-    Array.isArray(this.props.savedMetricsOptions) &&
-    this.props.savedMetricsOptions.length > 0
-      ? SAVED_TAB_KEY
-      : this.props.adhocMetric.expressionType;
+  defaultActiveTabKey = this.getDefaultTab();
 
   constructor(props) {
     super(props);
@@ -100,6 +104,7 @@ export default class AdhocMetricEditPopover extends React.PureComponent {
     this.onTabChange = this.onTabChange.bind(this);
     this.handleAceEditorRef = this.handleAceEditorRef.bind(this);
     this.refreshAceEditor = this.refreshAceEditor.bind(this);
+    this.getDefaultTab = this.getDefaultTab.bind(this);
 
     this.state = {
       adhocMetric: this.props.adhocMetric,
@@ -107,7 +112,6 @@ export default class AdhocMetricEditPopover extends React.PureComponent {
       width: POPOVER_INITIAL_WIDTH,
       height: POPOVER_INITIAL_HEIGHT,
     };
-
     document.addEventListener('mouseup', this.onMouseUp);
   }
 
@@ -136,6 +140,22 @@ export default class AdhocMetricEditPopover extends React.PureComponent {
   componentWillUnmount() {
     document.removeEventListener('mouseup', this.onMouseUp);
     document.removeEventListener('mousemove', this.onMouseMove);
+  }
+
+  getDefaultTab() {
+    const { adhocMetric, savedMetric, savedMetricsOptions, isNewMetric } =
+      this.props;
+    if (isDefined(adhocMetric.column) || isDefined(adhocMetric.sqlExpression)) {
+      return adhocMetric.expressionType;
+    }
+    if (
+      (isNewMetric || savedMetric.metric_name) &&
+      Array.isArray(savedMetricsOptions) &&
+      savedMetricsOptions.length > 0
+    ) {
+      return SAVED_TAB_KEY;
+    }
+    return adhocMetric.expressionType;
   }
 
   onSave() {
@@ -229,7 +249,7 @@ export default class AdhocMetricEditPopover extends React.PureComponent {
         POPOVER_INITIAL_WIDTH,
       ),
       height: Math.max(
-        this.dragStartHeight + (e.clientY - this.dragStartY) * 2,
+        this.dragStartHeight + (e.clientY - this.dragStartY),
         POPOVER_INITIAL_HEIGHT,
       ),
     });
@@ -253,7 +273,7 @@ export default class AdhocMetricEditPopover extends React.PureComponent {
   refreshAceEditor() {
     setTimeout(() => {
       if (this.aceEditorRef) {
-        this.aceEditorRef.editor.resize();
+        this.aceEditorRef.editor?.resize?.();
       }
     }, 0);
   }
@@ -280,17 +300,12 @@ export default class AdhocMetricEditPopover extends React.PureComponent {
       onClose,
       onResize,
       datasource,
+      isNewMetric,
+      isLabelModified,
       ...popoverProps
     } = this.props;
     const { adhocMetric, savedMetric } = this.state;
-    const keywords = sqlKeywords.concat(
-      columns.map(column => ({
-        name: column.column_name,
-        value: column.column_name,
-        score: 50,
-        meta: 'column',
-      })),
-    );
+    const keywords = sqlKeywords.concat(getColumnKeywords(columns));
 
     const columnValue =
       (adhocMetric.column && adhocMetric.column.column_name) ||
@@ -324,17 +339,10 @@ export default class AdhocMetricEditPopover extends React.PureComponent {
       autoFocus: true,
     };
 
-    if (
-      this.props.datasource?.type === 'druid' &&
-      aggregateSelectProps.options
-    ) {
-      aggregateSelectProps.options = aggregateSelectProps.options.filter(
-        aggregate => aggregate !== 'AVG',
-      );
-    }
-
     const stateIsValid = adhocMetric.isValid() || savedMetric?.metric_name;
     const hasUnsavedChanges =
+      isLabelModified ||
+      isNewMetric ||
       !adhocMetric.equals(propsAdhocMetric) ||
       (!(
         typeof savedMetric?.metric_name === 'undefined' &&
@@ -366,21 +374,51 @@ export default class AdhocMetricEditPopover extends React.PureComponent {
           allowOverflow
         >
           <Tabs.TabPane key={SAVED_TAB_KEY} tab={t('Saved')}>
-            <FormItem label={t('Saved metric')}>
-              <StyledSelect
-                options={
-                  Array.isArray(savedMetricsOptions)
-                    ? savedMetricsOptions.map(savedMetric => ({
-                        value: savedMetric.metric_name,
-                        label: savedMetric.metric_name,
-                        customLabel: this.renderMetricOption(savedMetric),
-                        key: savedMetric.id,
-                      }))
-                    : []
-                }
-                {...savedSelectProps}
+            {ensureIsArray(savedMetricsOptions).length > 0 ? (
+              <FormItem label={t('Saved metric')}>
+                <StyledSelect
+                  options={ensureIsArray(savedMetricsOptions).map(
+                    savedMetric => ({
+                      value: savedMetric.metric_name,
+                      label: savedMetric.metric_name,
+                      customLabel: this.renderMetricOption(savedMetric),
+                      key: savedMetric.id,
+                    }),
+                  )}
+                  {...savedSelectProps}
+                />
+              </FormItem>
+            ) : datasource.type === DatasourceType.Table ? (
+              <EmptyState
+                image="empty.svg"
+                size="small"
+                title={t('No saved metrics found')}
+                description={t(
+                  'Add metrics to dataset in "Edit datasource" modal',
+                )}
               />
-            </FormItem>
+            ) : (
+              <EmptyState
+                image="empty.svg"
+                size="small"
+                title={t('No saved metrics found')}
+                description={
+                  <>
+                    <span
+                      tabIndex={0}
+                      role="button"
+                      onClick={() => {
+                        this.props.handleDatasetModal(true);
+                        this.props.onClose();
+                      }}
+                    >
+                      {t('Create a dataset')}
+                    </span>
+                    {t(' to add metrics')}
+                  </>
+                }
+              />
+            )}
           </Tabs.TabPane>
           <Tabs.TabPane
             key={EXPRESSION_TYPES.SIMPLE}
@@ -424,18 +462,11 @@ export default class AdhocMetricEditPopover extends React.PureComponent {
           <Tabs.TabPane
             key={EXPRESSION_TYPES.SQL}
             tab={
-              extra.disallow_adhoc_metrics ||
-              this.props.datasource?.type === 'druid' ? (
+              extra.disallow_adhoc_metrics ? (
                 <Tooltip
-                  title={
-                    this.props.datasource?.type === 'druid'
-                      ? t(
-                          'Custom SQL ad-hoc metrics are not available for the native Druid connector',
-                        )
-                      : t(
-                          'Custom SQL ad-hoc metrics are not enabled for this dataset',
-                        )
-                  }
+                  title={t(
+                    'Custom SQL ad-hoc metrics are not enabled for this dataset',
+                  )}
                 >
                   {t('Custom SQL')}
                 </Tooltip>
@@ -444,10 +475,7 @@ export default class AdhocMetricEditPopover extends React.PureComponent {
               )
             }
             data-test="adhoc-metric-edit-tab#custom"
-            disabled={
-              extra.disallow_adhoc_metrics ||
-              this.props.datasource?.type === 'druid'
-            }
+            disabled={extra.disallow_adhoc_metrics}
           >
             <SQLEditor
               data-test="sql-editor"
@@ -458,7 +486,10 @@ export default class AdhocMetricEditPopover extends React.PureComponent {
               onChange={this.onSqlExpressionChange}
               width="100%"
               showGutter={false}
-              value={adhocMetric.sqlExpression || adhocMetric.translateToSql()}
+              value={
+                adhocMetric.sqlExpression ||
+                adhocMetric.translateToSql({ transformCountDistinct: true })
+              }
               editorProps={{ $blockScrolling: true }}
               enableLiveAutocompletion
               className="filter-sql-editor"
@@ -476,10 +507,8 @@ export default class AdhocMetricEditPopover extends React.PureComponent {
             {t('Close')}
           </Button>
           <Button
-            disabled={!stateIsValid}
-            buttonStyle={
-              hasUnsavedChanges && stateIsValid ? 'primary' : 'default'
-            }
+            disabled={!stateIsValid || !hasUnsavedChanges}
+            buttonStyle="primary"
             buttonSize="small"
             data-test="AdhocMetricEdit#save"
             onClick={this.onSave}

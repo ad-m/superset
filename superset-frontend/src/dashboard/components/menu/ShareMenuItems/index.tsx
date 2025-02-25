@@ -16,32 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React from 'react';
-import { useUrlShortener } from 'src/hooks/useUrlShortener';
+import { ComponentProps, RefObject } from 'react';
 import copyTextToClipboard from 'src/utils/copy';
-import { t } from '@superset-ui/core';
-import { Menu } from 'src/common/components';
-import { getUrlParam } from 'src/utils/urlUtils';
-import { URL_PARAMS } from 'src/constants';
-import {
-  createFilterKey,
-  getFilterValue,
-} from 'src/dashboard/components/nativeFilters/FilterBar/keyValue';
+import { t, logging } from '@superset-ui/core';
+import { Menu } from 'src/components/Menu';
+import { getDashboardPermalink } from 'src/utils/urlUtils';
+import { MenuKeys, RootState } from 'src/dashboard/types';
+import { shallowEqual, useSelector } from 'react-redux';
 
-interface ShareMenuItemProps {
-  url: string;
+interface ShareMenuItemProps extends ComponentProps<typeof Menu.SubMenu> {
+  url?: string;
   copyMenuItemTitle: string;
   emailMenuItemTitle: string;
   emailSubject: string;
   emailBody: string;
   addDangerToast: Function;
   addSuccessToast: Function;
-  dashboardId?: string;
+  dashboardId: string | number;
+  dashboardComponentId?: string;
+  copyMenuItemRef?: RefObject<any>;
+  shareByEmailMenuItemRef?: RefObject<any>;
+  selectedKeys?: string[];
+  setOpenKeys?: Function;
+  title: string;
+  disabled?: boolean;
 }
 
 const ShareMenuItems = (props: ShareMenuItemProps) => {
   const {
-    url,
     copyMenuItemTitle,
     emailMenuItemTitle,
     emailSubject,
@@ -49,63 +51,65 @@ const ShareMenuItems = (props: ShareMenuItemProps) => {
     addDangerToast,
     addSuccessToast,
     dashboardId,
+    dashboardComponentId,
+    title,
+    disabled,
     ...rest
   } = props;
+  const { dataMask, activeTabs } = useSelector(
+    (state: RootState) => ({
+      dataMask: state.dataMask,
+      activeTabs: state.dashboardState.activeTabs,
+    }),
+    shallowEqual,
+  );
 
-  const getShortUrl = useUrlShortener(url);
-
-  async function getCopyUrl() {
-    const risonObj = getUrlParam(URL_PARAMS.nativeFilters);
-    if (typeof risonObj === 'object' || !dashboardId) return null;
-    const prevData = await getFilterValue(
+  async function generateUrl() {
+    return getDashboardPermalink({
       dashboardId,
-      getUrlParam(URL_PARAMS.nativeFiltersKey),
-    );
-    const newDataMaskKey = await createFilterKey(
-      dashboardId,
-      JSON.stringify(prevData),
-    );
-    const newUrl = new URL(`${window.location.origin}${url}`);
-    newUrl.searchParams.set(URL_PARAMS.nativeFilters.name, newDataMaskKey);
-    return `${newUrl.pathname}${newUrl.search}`;
+      dataMask,
+      activeTabs,
+      anchor: dashboardComponentId,
+    });
   }
 
   async function onCopyLink() {
     try {
-      const copyUrl = await getCopyUrl();
-      const shortUrl = await getShortUrl(copyUrl);
-      await copyTextToClipboard(shortUrl);
+      await copyTextToClipboard(generateUrl);
       addSuccessToast(t('Copied to clipboard!'));
     } catch (error) {
-      addDangerToast(t('Sorry, your browser does not support copying.'));
+      logging.error(error);
+      addDangerToast(t('Sorry, something went wrong. Try again later.'));
     }
   }
 
   async function onShareByEmail() {
     try {
-      const copyUrl = await getCopyUrl();
-      const shortUrl = await getShortUrl(copyUrl);
-      const bodyWithLink = `${emailBody}${shortUrl}`;
-      window.location.href = `mailto:?Subject=${emailSubject}%20&Body=${bodyWithLink}`;
+      const encodedBody = encodeURIComponent(
+        `${emailBody}${await generateUrl()}`,
+      );
+      const encodedSubject = encodeURIComponent(emailSubject);
+      window.location.href = `mailto:?Subject=${encodedSubject}%20&Body=${encodedBody}`;
     } catch (error) {
+      logging.error(error);
       addDangerToast(t('Sorry, something went wrong. Try again later.'));
     }
   }
 
   return (
-    <>
-      <Menu.Item key="copy-url" {...rest}>
-        <div onClick={onCopyLink} role="button" tabIndex={0}>
-          {copyMenuItemTitle}
-        </div>
+    <Menu.SubMenu
+      title={title}
+      key={MenuKeys.Share}
+      disabled={disabled}
+      {...rest}
+    >
+      <Menu.Item key={MenuKeys.CopyLink} onClick={() => onCopyLink()}>
+        {copyMenuItemTitle}
       </Menu.Item>
-      <Menu.Item key="share-by-email" {...rest}>
-        <div onClick={onShareByEmail} role="button" tabIndex={0}>
-          {emailMenuItemTitle}
-        </div>
+      <Menu.Item key={MenuKeys.ShareByEmail} onClick={() => onShareByEmail()}>
+        {emailMenuItemTitle}
       </Menu.Item>
-    </>
+    </Menu.SubMenu>
   );
 };
-
 export default ShareMenuItems;
